@@ -23,6 +23,8 @@ block content
     tbody
       each user in users
         tr
+          td.align-middle
+            img(src=user.avatarUrl, width="50", height="50")
           td.align-middle= user.name
           td.align-middle= user.age
           if(userLogin.isAdmin)

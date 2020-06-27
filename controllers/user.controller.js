@@ -1,16 +1,20 @@
-var db = require('../db');
+var User = require('../models/user.model');
 const shortid = require('shortid');
 
-module.exports.index = function(req, res) {
+module.exports.index = async function(req, res) {
+  var id = req.signedCookies.userId;
   var page = parseInt(req.query.page) || 1;
   var perPage = 8;
   var drop = (page - 1) * perPage;
-  var users = db.get('users').drop(drop).take(perPage).value();
-  var totalPage = Math.ceil(db.get('users').value().length / perPage);
+  var users = await User.find().limit(perPage).skip(drop);
+
+  // var users = db.get('users').drop(drop).take(perPage).value();
+  var totalUser = await User.find();
+  var totalPage = Math.ceil(totalUser.length / perPage);
 
   res.render('users/index', {
     users: users,
-    userLogin: db.get('users').find({ id: req.signedCookies.userId}).value(),
+    userLogin: await User.findById(id),
     nextPage: page + 1,
     prePage: page - 1,
     totalPage: totalPage,
@@ -22,35 +26,35 @@ module.exports.create = function(req, res) {
   res.render('users/create');
 }
 
-module.exports.views = function(req, res) {
+module.exports.views = async function(req, res) {
   var id = req.params.id;
-  var user = db.get('users').find({ id: id }).value();
+  var user = await User.findById(id);
   res.render('users/views', {
     user: user
   })
 }
 
-module.exports.update = function(req, res) {
+module.exports.update = async function(req, res) {
   var id = req.params.id;
-  var user = db.get('users').find({ id: id }).value();
+  var user = await User.findById(id);
   res.render('users/update', {
     user: user
   })
 }
 
-module.exports.delete = function(req, res) {
+module.exports.delete = async function(req, res) {
   var id = req.params.id;
-  db.get('users').remove({ id: id }).write();
+  await User.findByIdAndRemove(id)
   res.redirect('back');
 }
 
-module.exports.search = function(req, res) {
+module.exports.search = async function(req, res) {
   var q = req.query.q;
   var userId = req.signedCookies.userId;
-  var user = db.get('users').find({ id: userId}).value();
-  var matchedUser = db.get('users').value();
+  var user = await User.findById(userId);
+  var matchedUser = await User.find();
   if(q) {
-    matchedUser = db.get('users').value().filter(function(user) {
+    matchedUser = matchedUser.filter(function(user) {
 			return user.name.toLowerCase().indexOf(q.toLowerCase()) !== -1;
 		});
   }
@@ -61,15 +65,13 @@ module.exports.search = function(req, res) {
   })
 }
 
-module.exports.postCreate = function(req, res) {
-  req.body.id = shortid.generate();
-
-  db.get('users').push(req.body).write();
+module.exports.postCreate = async function(req, res) {
+  await User.insertMany(req.body);
   res.redirect('/users');
 }
 
-module.exports.postUpdate = function(req, res) {
+module.exports.postUpdate = async function(req, res) {
   var id = req.body.id;
-  db.get('users').find({ id: id }).assign({ name: req.body.name, age: req.body.age, address: req.body.address, phone: req.body.phone }).write();
+  await User.findByIdAndUpdate(id, { name: req.body.name, age: req.body.age, address: req.body.address, phone: req.body.phone })
   res.redirect('/users');
 }

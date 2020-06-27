@@ -1,16 +1,16 @@
-var db = require('../db');
-const shortid = require('shortid');
+var Session = require('../models/session.model');
+var Book = require('../models/book.model');
+var Transaction = require('../models/transaction.model');
 
-module.exports.index = function(req, res) {
+module.exports.index = async function(req, res) {
   var sessionId = req.signedCookies.sessionId;
-  var items = db.get('sessions').find({ id: sessionId }).value().cart;
+  var items = await Session.findOne({ sessionId: sessionId });
 
   var booksItem = []
-  for(var item in items) {
-    var book = db.get('books').find({ id: item }).value();
-    var bookCopy = Object.assign({}, book);
-    bookCopy.amount = items[item];
-    booksItem.push(bookCopy);
+  for(var item in items.cart) {
+    var book = await Book.findById(item);
+    book.amount = items.cart[item];
+    booksItem.push(book);
   }
 
   res.render('cart/index', {
@@ -18,7 +18,7 @@ module.exports.index = function(req, res) {
   });
 }
 
-module.exports.addToCart = function(req, res) {
+module.exports.addToCart = async function(req, res) {
   var bookId = req.params.bookId;
   var sessionId = req.signedCookies.sessionId;
 
@@ -27,41 +27,32 @@ module.exports.addToCart = function(req, res) {
     return;
   }
 
-  var count = db
-  .get('sessions')
-  .find({ id: sessionId})
-  .get('cart.' + bookId, 0)
-  .value();
-
-  db.get('sessions')
-  .find({ id: sessionId})
-  .set('cart.' + bookId, count + 1)
-  .write();
+  await Session.findOneAndUpdate({ sessionId: sessionId }, {
+    $inc: { ['cart.' + bookId]: 1 }
+  })
 
   res.redirect('/books')
 
 };
 
-module.exports.rental = function (req, res) {
-  var id = shortid.generate();
+module.exports.rental = async function (req, res) {
   var userId = req.signedCookies.userId;
   var sessionId = req.signedCookies.sessionId;
-  var items = db.get('sessions').find({ id: sessionId }).value().cart;
+  var transaction = await Transaction.findOne({ userId: userId});
+  var items = await Session.findOne({ sessionId: sessionId });
 
-  var transaction = []
-  for(var item in items) {
-    var book = db.get('books').find({ id: item }).value();
-    var bookCopy = Object.assign({}, book);
-    bookCopy.isComplete = false;
-    bookCopy.amount = items[item];
-    bookCopy.bookId = book.id;
-    delete bookCopy.id;
-    delete bookCopy.coverUrl;
-    delete bookCopy.description;
-    transaction.push(bookCopy);
+  var books = []
+  for(var item in items.cart) {
+    var book = await Book.findById(item).lean();
+    book.isComplete = false;
+    book.amount = items.cart[item];
+    book.bookId = item;
+    delete book._id;
+    delete book.coverUrl;
+    delete book.description;
+    books.push(book);
   }
-
-  db.get('transactions').push({id: id, userId: userId, books: transaction}).write();
+  await Transaction.insertMany({userId: userId, books: books});
 
   res.clearCookie("sessionId");
 

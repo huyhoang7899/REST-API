@@ -1,5 +1,6 @@
 require('dotenv').config();
-var db = require('../db');
+var User = require('../models/user.model');
+
 var nodemailer = require('nodemailer');
 var smtpTransport = require('nodemailer-smtp-transport');
 
@@ -12,7 +13,8 @@ module.exports.login = function(req, res) {
 module.exports.postLogin = async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
-  var user = db.get('users').find({ email: email}).value();
+
+  var user = await User.findOne({ email: email });
 
   if (!user) {
     res.render('auth/login', {
@@ -23,10 +25,11 @@ module.exports.postLogin = async function(req, res) {
   }
 
   if (!user.wrongLoginCount) {
-    db.get('users')
-    .find({ id: user.id })
-    .set( "wrongLoginCount", 0)
-    .write()
+    await User.findOneAndUpdate({ email: email }, {
+      $set: {
+        wrongLoginCount: 0
+      }
+    });
   }
 
   if (user.wrongLoginCount >= 4) {
@@ -65,10 +68,7 @@ module.exports.postLogin = async function(req, res) {
   var checkPassword = await bcrypt.compare(req.body.password, user.password)
 
   if (!checkPassword) {
-    db.get('users')
-    .find({ id: user.id })
-    .assign({ wrongLoginCount: (user.wrongLoginCount += 1) })
-    .write()
+    await User.findOneAndUpdate({ email: email }, { wrongLoginCount: (user.wrongLoginCount += 1) });
 
     res.render('auth/login', {
       errors: [ "Password Wrong !" ],
@@ -77,10 +77,7 @@ module.exports.postLogin = async function(req, res) {
     return;
   }
 
-  db.get('users')
-    .find({ id: user.id })
-    .assign({ wrongLoginCount: 0 })
-    .write()
+  await User.findOneAndUpdate({ email: email }, { wrongLoginCount: 0 });
 
   res.cookie("userId", user.id, {
     signed: true

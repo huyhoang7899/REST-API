@@ -1,11 +1,10 @@
-const shortid = require('shortid');
+var Book = require('../models/book.model');
+var User = require('../models/user.model');
 
-var db = require('../db');
-
-module.exports.index = function(req, res) {
+module.exports.index = async function(req, res) {
   res.render('books/index',{
-   books: db.get('books').value(),
-   user: db.get('users').find({ id: req.signedCookies.userId}).value()
+   books: await Book.find(),
+   user: await User.findById(req.signedCookies.userId)
   });
 }
 
@@ -13,27 +12,27 @@ module.exports.create = function(req, res) {
   res.render('books/create');
 }
 
-module.exports.update = function(req, res) {
+module.exports.update = async function(req, res) {
   var id = req.params.id;
-  var book = db.get('books').find({ id: id }).value();
+  var book = await Book.findById(id);
   res.render('books/update', {
     book: book
   });
 }
 
-module.exports.delete = function(req, res) {
+module.exports.delete = async function(req, res) {
   var id = req.params.id;
-  db.get('books').remove({ id: id }).write();
+  await Book.findByIdAndRemove(id);
   res.redirect('back');
 }
 
-module.exports.search = function(req, res) {
+module.exports.search = async function(req, res) {
   var q = req.query.q;
   var userId = req.signedCookies.userId;
-  var user = db.get('users').find({ id: userId}).value();
-  var matchedBook = db.get('books').value();
+  var user = await User.findById(userId);
+  var matchedBook = await Book.find();
   if(q) {
-    matchedBook = db.get('books').value().filter(function(book) {
+    matchedBook = matchedBook.filter(function(book) {
       return book.title.toLowerCase().indexOf(q.toLowerCase()) !== -1;
     })
   }
@@ -54,16 +53,15 @@ module.exports.postCreate = function(req, res) {
     api_secret: process.env.SESSION_API_SECRET
   });
 
-  cloudinary.v2.uploader.upload(pathBookCover, function(error, result) {
-    req.body.id = shortid.generate();
+  cloudinary.v2.uploader.upload(pathBookCover, async function(error, result) {
     req.body.coverUrl = result.url;
-    db.get('books').push(req.body).write();
+    await Book.insertMany(req.body);
     res.redirect('/books');
   });
 }
 
-module.exports.postUpdate = function(req, res) {
+module.exports.postUpdate = async function(req, res) {
   var id = req.body.id;
-  db.get('books').find({ id: id }).assign({ title: req.body.title, description: req.body.description}).write();
+  await Book.findByIdAndUpdate(id, { title: req.body.title, description: req.body.description});
   res.redirect('/books');
 }

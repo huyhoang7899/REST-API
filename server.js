@@ -1,6 +1,10 @@
-const express = require('express');
+var express = require('express');
 var cookieParser = require('cookie-parser');
-const port = 3000;
+var mongoose = require('mongoose');
+var port = 3000;
+
+mongoose.set('useUnifiedTopology', true);
+mongoose.connect('mongodb://localhost/test', {useNewUrlParser: true});
 
 var userRouter = require('./routers/user.router');
 var bookRouter = require('./routers/book.router');
@@ -12,7 +16,7 @@ var authMiddleware = require('./middlewares/auth.middleware');
 var cartRouter = require('./routers/cart.router');
 var sessionMiddleware = require('./middlewares/session.middleware')
 
-const app = express();
+var app = express();
 
 app.use(express.json()) // for parsing application/json
 app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded

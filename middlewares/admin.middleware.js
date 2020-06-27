@@ -1,7 +1,7 @@
-var db = require('../db.js');
+var User = require('../models/user.model');
 
-module.exports.requireAdminTransaction = function(req, res, next) {
-  var user = db.get('users').find({ id: req.signedCookies.userId }).value();
+module.exports.requireAdminTransaction = async function(req, res, next) {
+  var user = await User.findById(req.signedCookies.userId);
 
   if(!user.isAdmin) {
     res.redirect('/transactions');
@@ -11,8 +11,8 @@ module.exports.requireAdminTransaction = function(req, res, next) {
   next();
 }
 
-module.exports.requireAdminBook = function(req, res, next) {
-  var user = db.get('users').find({ id: req.signedCookies.userId }).value();
+module.exports.requireAdminBook = async function(req, res, next) {
+  var user = await User.findById(req.signedCookies.userId);
 
   if(!user.isAdmin) {
     res.redirect('/books');
@@ -22,8 +22,8 @@ module.exports.requireAdminBook = function(req, res, next) {
   next();
 }
 
-module.exports.requireAdminUser = function(req, res, next) {
-  var user = db.get('users').find({ id: req.signedCookies.userId }).value();
+module.exports.requireAdminUser = async function(req, res, next) {
+  var user = await User.findById(req.signedCookies.userId);
 
   if(!user.isAdmin) {
     res.redirect('/users');

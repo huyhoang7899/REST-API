@@ -1,8 +1,8 @@
-const db = require('../db');
+var Transaction = require('../models/transaction.model');
 
-module.exports.complete = function(req, res, next) {
+module.exports.complete = async function(req, res, next) {
   var userId = req.params.userId;
-  var transaction = db.get('transactions').find({ userId: userId }).value();
+  var transaction = await Transaction.findOne({ userId: userId });
   if (!transaction) {
      res.render('transaction/index', {
       transactions: db.get('transactions').value(),

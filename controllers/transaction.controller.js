@@ -1,13 +1,14 @@
-const shortid = require('shortid');
-const db = require('../db');
+var Transaction = require('../models/transaction.model');
+var User = require('../models/user.model');
+var Book = require('../models/book.model');
 
-module.exports.index = function(req, res) {
+module.exports.index = async function(req, res) {
   var userId = req.signedCookies.userId;
-  var user = db.get('users').find({ id: userId}).value();
-  var transactions = db.get('transactions').value();
+  var user = await User.findById(userId);
+  var transactions = await Transaction.find();
 
   if (!user.isAdmin) {
-    transactions = db.get('transactions').filter({ userId: userId }).value();
+    transactions = await Transaction.find({ userId: userId });
   }
 
   res.render('transaction/index', {
@@ -16,17 +17,17 @@ module.exports.index = function(req, res) {
   });
 }
 
-module.exports.create = function(req, res) {
+module.exports.create = async function(req, res) {
   res.render('transaction/create', {
-    users: db.get('users').value(),
-    books: db.get('books').value()
+    users: await User.find(),
+    books: await Book.find()
   });
 }
 
-module.exports.update = function(req, res) {
+module.exports.update = async function(req, res) {
   var userId = req.params.userId;
   var bookId = req.params.bookId;
-  var transaction = db.get('transactions').find({ userId: userId }).value();
+  var transaction = await Transaction.findOne({ userId: userId });
 
   var book = transaction.books.find(function(item) {
     return item.bookId === bookId
@@ -38,35 +39,33 @@ module.exports.update = function(req, res) {
   });
 }
 
-module.exports.delete = function(req, res) {
+module.exports.delete = async function(req, res) {
   var userId = req.params.userId;
   var bookId = req.params.bookId;
 
-  var transaction = db.get('transactions').find({ userId: userId }).value();
-  var transactionCopy =  Object.assign({}, transaction)
+  var transaction = await Transaction.findOne({ userId: userId });
 
-  for (var i = 0; i < transactionCopy.books.length; i++) {
-    if (transactionCopy.books[i].bookId === bookId) {
-      transactionCopy.books.splice(i, 1);
+  for (var i = 0; i < transaction.books.length; i++) {
+    if (transaction.books[i].bookId === bookId) {
+      transaction.books.splice(i, 1);
     }
   }
 
-  db.get('transactions').find({ userId: userId }).assign({ books: transactionCopy.books }).write();
-
+  await Transaction.findOneAndUpdate({ userId: userId }, { books: transaction.books });
   res.redirect('back');
 }
 
-module.exports.search = function(req, res) {
+module.exports.search = async function(req, res) {
   var userId = req.signedCookies.userId;
-  var user = db.get('users').find({ id: userId}).value();
+  var user = await User.findById(userId);
   var q = req.query.q;
-  var matchedTransaction = db.get('transactions').value();
+  var matchedTransaction = await Transaction.find();
   if(q) {
-    matchedTransaction = db.get('transactions').value().filter(function(transaction) {
+    matchedTransaction = matchedTransaction.filter(function(transaction) {
       return transaction.userId.toLowerCase().indexOf(q.toLowerCase()) != -1;
     });
   }
-  console.log(matchedTransaction)
+
   res.render('transaction/index', {
     transactions: matchedTransaction,
     q: q,
@@ -74,41 +73,36 @@ module.exports.search = function(req, res) {
   })
 }
 
-module.exports.postCreate = function(req, res) {
-  var id = shortid.generate();
+module.exports.postCreate = async function(req, res) {
   var userId = req.body.userId;
   var bookId = req.body.bookId;
+  var transaction = await Transaction.findOne({ userId: userId});
+  var book = await Book.findById(bookId);
   var books = [];
 
   req.body.isComplete = false;
-  req.body.title = db.get('books').find({ id: req.body.bookId }).value().title;
+  req.body.title = book.title;
   delete req.body.userId;
   books.push(req.body)
 
-
-
-  if(!db.get('transactions').find({ userId: userId}).value()) {
-    db.get('transactions').push({id: id, userId: userId, books: books}).write();
+  if(!transaction) {
+    await Transaction.insertMany({userId: userId, books: books});
     res.redirect('/transactions');
     return;
   }
 
-  var transaction = db.get('transactions').find({ userId: userId }).value();
-  var transactionCopy =  Object.assign({}, transaction)
-
-  transactionCopy.books.push(req.body);
-  db.get('transactions').find({ userId: userId }).assign({ books: transactionCopy.books}).write();
+  transaction.books.push(req.body);
+  await Transaction.findOneAndUpdate({ userId: userId }, { books: transaction.books})
   res.redirect('/transactions');
 }
 
-module.exports.postUpdate = function(req, res) {
+module.exports.postUpdate = async function(req, res) {
   var userId = req.params.userId;
   var bookId = req.params.bookId;
 
-  var transaction = db.get('transactions').find({ userId: userId }).value();
-  var transactionCopy =  Object.assign({}, transaction)
+  var transaction = await Transaction.findOne({ userId: userId });
 
-  for (var book of transactionCopy.books) {
+  for (var book of transaction.books) {
     if (book.bookId === bookId) {
        book.bookId = req.body.bookId;
        book.title = req.body.title;
@@ -116,26 +110,23 @@ module.exports.postUpdate = function(req, res) {
        break;
     }
   }
-  db.get('transactions').find({ userId: userId }).assign({ books: transactionCopy.books }).write();
-
+  await Transaction.findOneAndUpdate({ userId: userId }, { books: transaction.books})
   res.redirect('/transactions');
 }
 
-module.exports.complete = function(req, res) {
+module.exports.complete = async function(req, res) {
   var userId = req.params.userId;
   var bookId = req.params.bookId;
 
-  var transaction = db.get('transactions').find({ userId: userId }).value();
-  var transactionCopy =  Object.assign({}, transaction)
+  var transaction = await Transaction.findOne({ userId: userId });
 
-  for (var book of transactionCopy.books) {
+  for (var book of transaction.books) {
     if (book.bookId === bookId) {
       book.isComplete = true
       break;
     }
   }
 
-  db.get('transactions').find({ userId: userId }).assign({ books: transactionCopy.books }).write();
-
+  await Transaction.findOneAndUpdate({ userId: userId }, { books: transaction.books});
   res.redirect('/transactions');
 }
